@@ -6,34 +6,25 @@ import './globals.css'
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
+const APP_URL = process.env.NEXT_PUBLIC_URL || 'https://fc-spend-on-base-22.vercel.app'
+
 export const metadata: Metadata = {
   title: 'You Spend - Track Your Base Network Transactions',
   description: 'Track your ETH spending on fees and NFTs on Base Network',
-  generator: 'v0.app',
-  icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+  metadataBase: new URL(APP_URL),
+  openGraph: {
+    title: 'You Spend',
+    description: 'Track your ETH spending on fees and NFTs on Base Network',
+    images: [`${APP_URL}/api/og`],
   },
   other: {
     'fc:frame': 'vNext',
-    'fc:frame:image': `${process.env.NEXT_PUBLIC_URL || 'https://you-spend.vercel.app'}/api/og`,
+    'fc:frame:image': `${APP_URL}/api/og`,
     'fc:frame:button:1': 'Launch App',
     'fc:frame:button:1:action': 'link',
-    'fc:frame:button:1:target': process.env.NEXT_PUBLIC_URL || 'https://you-spend.vercel.app',
+    'fc:frame:button:1:target': APP_URL,
   },
+    generator: 'v0.app'
 }
 
 export const viewport: Viewport = {
@@ -52,16 +43,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <meta property="og:title" content="You Spend" />
-        <meta property="og:description" content="Track your ETH spending on Base Network" />
-        <meta property="og:image" content={`${process.env.NEXT_PUBLIC_URL || 'https://you-spend.vercel.app'}/api/og`} />
-        <meta name="fc:frame" content="vNext" />
-        <meta name="fc:frame:image" content={`${process.env.NEXT_PUBLIC_URL || 'https://you-spend.vercel.app'}/api/og`} />
-        <meta name="fc:frame:button:1" content="Launch App" />
-        <meta name="fc:frame:button:1:action" content="link" />
-        <meta name="fc:frame:button:1:target" content={process.env.NEXT_PUBLIC_URL || 'https://you-spend.vercel.app'} />
+        <meta property="fc:frame" content="vNext" />
+        <meta property="fc:frame:image" content={`${APP_URL}/api/og`} />
+        <meta property="fc:frame:button:1" content="Launch App" />
+        <meta property="fc:frame:button:1:action" content="link" />
+        <meta property="fc:frame:button:1:target" content={APP_URL} />
       </head>
-      <body className={`font-sans antialiased`}>
+      <body className="font-sans antialiased">
         {children}
         <Analytics />
       </body>

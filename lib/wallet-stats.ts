@@ -1,133 +1,44 @@
 import { createPublicClient, http, formatEther } from 'viem'
 import { base } from 'viem/chains'
-
-const ALCHEMY_URL = 'https://base-mainnet.g.alchemy.com/v2/mdOVpuLVkiRVA_kfq7gEq-rRLukXm40B'
+import { formatUnits } from 'ethers'
 
 const client = createPublicClient({
   chain: base,
-  transport: http(ALCHEMY_URL),
+  transport: http('https://base-mainnet.g.alchemy.com/v2/yourAlchemyAPIKey'), // Placeholder for server-side API key
 })
 
-interface Transaction {
-  hash: string
-  from: string
-  to: string | null
-  value: string
-  gasPrice: string
-  gas: string
-  input: string
-  blockNumber: string
+interface AlchemyTransfer {
+  category: string
+  value?: number
+  asset?: string
+  from?: string
+  to?: string
+  blockNum?: string
+  hash?: string
 }
 
-interface TransactionReceipt {
-  gasUsed: string
-  effectiveGasPrice: string
-  status: string
-}
-
-function isNFTTransfer(tx: Transaction): { isNFT: boolean; isReceiving: boolean } {
-  const input = tx.input.toLowerCase()
-  // ERC721 transferFrom: 0x23b872dd
-  // ERC721 safeTransferFrom: 0x42842e0e
-  // ERC1155 safeTransferFrom: 0xf242432a
-  const nftMethods = ['0x23b872dd', '0x42842e0e', '0xf242432a', '0xa22cb465']
-  
-  const isNFT = nftMethods.some(method => input.startsWith(method))
-  
-  return { isNFT, isReceiving: false }
+interface AlchemyResponse {
+  result?: {
+    transfers: AlchemyTransfer[]
+  }
 }
 
 export async function fetchWalletStats(address: string) {
   try {
     console.log('[v0] Fetching wallet stats for:', address)
     
-    const response = await fetch(ALCHEMY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'alchemy_getAssetTransfers',
-        params: [{
-          fromAddress: address,
-          category: ['external', 'erc721', 'erc1155'],
-          withMetadata: true,
-          maxCount: '0x3e8', // 1000 transactions
-        }]
-      })
-    })
-
+    const response = await fetch(`/api/wallet-stats?address=${address}`)
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch wallet stats')
+    }
+    
     const data = await response.json()
-    const transfers = data.result?.transfers || []
-
-    let totalFees = BigInt(0)
-    let totalNFTPurchases = BigInt(0)
-    
-    // Fetch transactions to calculate gas fees
-    const txResponse = await fetch(ALCHEMY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 2,
-        method: 'eth_getBlockByNumber',
-        params: ['latest', false]
-      })
-    })
-
-    // Calculate gas fees and NFT purchases
-    for (const transfer of transfers) {
-      if (transfer.category === 'erc721' || transfer.category === 'erc1155') {
-        // NFT transfer - if value exists, it's a purchase
-        if (transfer.value) {
-          const valueInWei = BigInt(Math.floor(parseFloat(transfer.value) * 1e18))
-          totalNFTPurchases += valueInWei
-        }
-      }
-      
-      // Estimate gas fees (using average of ~0.0001 ETH per transaction)
-      totalFees += BigInt('100000000000000') // 0.0001 ETH per transaction
-    }
-
-    const salesResponse = await fetch(ALCHEMY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 3,
-        method: 'alchemy_getAssetTransfers',
-        params: [{
-          toAddress: address,
-          category: ['external'],
-          withMetadata: true,
-          maxCount: '0x3e8',
-        }]
-      })
-    })
-
-    const salesData = await salesResponse.json()
-    const salesTransfers = salesData.result?.transfers || []
-    
-    let totalNFTSales = BigInt(0)
-    
-    for (const transfer of salesTransfers) {
-      // Count incoming ETH as potential NFT sales
-      if (transfer.value && parseFloat(transfer.value) > 0) {
-        const valueInWei = BigInt(Math.floor(parseFloat(transfer.value) * 1e18))
-        totalNFTSales += valueInWei
-      }
-    }
-
-    console.log('[v0] Stats calculated:', {
-      totalFees: totalFees.toString(),
-      totalNFTPurchases: totalNFTPurchases.toString(),
-      totalNFTSales: totalNFTSales.toString(),
-    })
     
     return {
-      totalFees,
-      totalNFTPurchases,
-      totalNFTSales,
+      totalFees: BigInt(Math.floor(parseFloat(data.totalFees) * 1e18)),
+      totalNFTPurchases: BigInt(Math.floor(parseFloat(data.totalNFTPurchases) * 1e18)),
+      totalNFTSales: BigInt(Math.floor(parseFloat(data.totalNFTSales) * 1e18)),
     }
   } catch (error) {
     console.error('[v0] Error fetching wallet stats:', error)

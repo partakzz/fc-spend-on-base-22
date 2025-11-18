@@ -21,17 +21,17 @@ export default function Home() {
   useEffect(() => {
     const initSDK = async () => {
       try {
-        await sdk.actions.ready()
-        setIsSDKLoaded(true)
+        const isInFarcaster = typeof window !== 'undefined' && 
+          (window.location !== window.parent.location || 
+           /farcaster/i.test(window.navigator.userAgent))
         
-        // Check if context exists and has a wallet address
-        const context = await sdk.context
-        if (context?.user?.username) {
-          console.log('[v0] Farcaster context loaded:', context)
+        if (isInFarcaster) {
+          await sdk.actions.ready()
         }
+        setIsSDKLoaded(true)
       } catch (error) {
-        console.error('[v0] Error initializing Farcaster SDK:', error)
-        setIsSDKLoaded(true) // Still set to true to show the UI
+        console.error('Error initializing Farcaster SDK:', error)
+        setIsSDKLoaded(true)
       }
     }
 
@@ -44,33 +44,35 @@ export default function Home() {
     try {
       setIsLoading(true)
       
-      const provider = await sdk.wallet.ethProvider
+      let address: string | null = null
       
-      if (provider) {
-        // Request accounts from the wallet
-        const accounts = await provider.request({
-          method: 'eth_requestAccounts',
-        }) as string[]
+      try {
+        const provider = await sdk.wallet.ethProvider
         
-        if (accounts && accounts.length > 0) {
-          const address = accounts[0]
-          setWalletAddress(address)
+        if (provider) {
+          const accounts = await provider.request({
+            method: 'eth_requestAccounts',
+          }) as string[]
           
-          // Fetch wallet statistics using Alchemy API
-          const walletStats = await fetchWalletStats(address)
-          setStats(walletStats)
+          if (accounts && accounts.length > 0) {
+            address = accounts[0]
+          }
         }
-      } else {
-        // Fallback for demo
-        const mockAddress = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
-        setWalletAddress(mockAddress)
-        
-        const walletStats = await fetchWalletStats(mockAddress)
-        setStats(walletStats)
+      } catch (sdkError) {
+        console.log('Farcaster wallet not available, using demo address')
       }
       
+      if (!address) {
+        address = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+      }
+      
+      setWalletAddress(address)
+      
+      const walletStats = await fetchWalletStats(address)
+      setStats(walletStats)
+      
     } catch (error) {
-      console.error('[v0] Error connecting wallet:', error)
+      console.error('Error connecting wallet:', error)
       
       const mockAddress = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
       setWalletAddress(mockAddress)
@@ -97,13 +99,11 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-6">
       <div className="w-full max-w-md space-y-6">
-        {/* App Title */}
         <h1 className="text-5xl font-bold text-center text-primary">
           You Spend
         </h1>
 
         {!walletAddress ? (
-          /* Connect Wallet View */
           <Card className="p-8 flex items-center justify-center min-h-[300px]">
             <Button 
               onClick={connectWallet}
@@ -122,9 +122,7 @@ export default function Home() {
             </Button>
           </Card>
         ) : (
-          /* Stats View */
           <>
-            {/* USD Mode Toggle */}
             <div className="flex justify-center">
               <Button 
                 onClick={toggleUsdMode}
@@ -136,7 +134,6 @@ export default function Home() {
               </Button>
             </div>
 
-            {/* Stats Card */}
             <Card className="p-6">
               {stats ? (
                 <SpendingStats 
@@ -153,7 +150,6 @@ export default function Home() {
           </>
         )}
 
-        {/* Footer */}
         <p className="text-center text-sm text-muted-foreground">
           Powered by Base Network
         </p>
