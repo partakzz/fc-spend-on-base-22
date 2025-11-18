@@ -1,0 +1,8 @@
+{
+  "version": "vNext",
+  "name": "You Spend",
+  "iconUrl": "https://you-spend.vercel.app/icon.svg",
+  "splashImageUrl": "https://you-spend.vercel.app/api/og",
+  "splashBackgroundColor": "#0052FF",
+  "homeUrl": "https://you-spend.vercel.app"
+}
