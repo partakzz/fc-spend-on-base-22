@@ -28,9 +28,9 @@ export default function Home() {
         if (isInFarcaster) {
           await sdk.actions.ready()
         }
-        setIsSDKLoaded(true)
       } catch (error) {
         console.error('Error initializing Farcaster SDK:', error)
+      } finally {
         setIsSDKLoaded(true)
       }
     }
@@ -91,7 +91,10 @@ export default function Home() {
   if (!isSDKLoaded) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+        <div className="text-center">
+          <h1 className="text-5xl font-bold text-primary mb-4">You Spend</h1>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto"></div>
+        </div>
       </main>
     )
   }
