@@ -16,7 +16,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false)
   const [stats, setStats] = useState<{
     totalFees: bigint
-    totalNFTMints: bigint // added totalNFTMints field
+    totalNFTMints: bigint
     totalNFTPurchases: bigint
     totalNFTSales: bigint
   } | null>(null)
@@ -38,6 +38,26 @@ export default function Home() {
     initSDK()
   }, [])
 
+  useEffect(() => {
+    if (!sdkReady) return
+    
+    const savedAddress = localStorage.getItem('wallet_address')
+    const savedUsername = localStorage.getItem('wallet_username')
+    const savedPfpUrl = localStorage.getItem('wallet_pfp')
+    
+    if (savedAddress) {
+      setWalletAddress(savedAddress)
+      setUserProfile({
+        username: savedUsername || 'Anonymous',
+        pfpUrl: savedPfpUrl || ''
+      })
+      
+      fetchStats(savedAddress).then(walletStats => {
+        setStats(walletStats)
+      })
+    }
+  }, [sdkReady])
+
   const fetchStats = async (address: string) => {
     try {
       const response = await fetch(`/api/wallet-stats?address=${address}`)
@@ -50,7 +70,7 @@ export default function Home() {
       
       return {
         totalFees: BigInt(Math.floor(parseFloat(data.totalFees) * 1e18)),
-        totalNFTMints: BigInt(Math.floor(parseFloat(data.totalNFTMints) * 1e18)), // added totalNFTMints parsing
+        totalNFTMints: BigInt(Math.floor(parseFloat(data.totalNFTMints) * 1e18)),
         totalNFTPurchases: BigInt(Math.floor(parseFloat(data.totalNFTPurchases) * 1e18)),
         totalNFTSales: BigInt(Math.floor(parseFloat(data.totalNFTSales) * 1e18)),
       }
@@ -58,7 +78,7 @@ export default function Home() {
       console.error('Error fetching wallet stats:', error)
       return {
         totalFees: BigInt(Math.floor(0.05 * 1e18)),
-        totalNFTMints: BigInt(Math.floor(0.3 * 1e18)), // added demo totalNFTMints value
+        totalNFTMints: BigInt(Math.floor(0.3 * 1e18)),
         totalNFTPurchases: BigInt(Math.floor(1.2 * 1e18)),
         totalNFTSales: BigInt(Math.floor(2.5 * 1e18)),
       }
@@ -75,7 +95,6 @@ export default function Home() {
       
       if (sdkReady) {
         try {
-          // Get Farcaster context with user info
           const context = await sdk.context
           
           if (context?.user) {
@@ -85,7 +104,6 @@ export default function Home() {
             console.log("[v0] Got Farcaster user:", username)
           }
           
-          // Get wallet address from Farcaster embedded wallet
           const wallet = await sdk.wallet.ethProvider.request({
             method: 'eth_requestAccounts',
           }) as string[]
@@ -99,7 +117,6 @@ export default function Home() {
         }
       }
       
-      // Fallback to regular Ethereum provider if Farcaster wallet unavailable
       if (!address && typeof window !== 'undefined' && (window as any).ethereum) {
         try {
           const accounts = await (window as any).ethereum.request({
@@ -117,6 +134,10 @@ export default function Home() {
       if (!address) {
         address = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
       }
+      
+      localStorage.setItem('wallet_address', address)
+      localStorage.setItem('wallet_username', username)
+      localStorage.setItem('wallet_pfp', pfpUrl)
       
       setWalletAddress(address)
       setUserProfile({ username, pfpUrl })
@@ -196,7 +217,7 @@ export default function Home() {
               </Button>
             </div>
 
-            <Card className="p-5">
+            <Card className="p-4">
               {stats ? (
                 <SpendingStats 
                   stats={stats}

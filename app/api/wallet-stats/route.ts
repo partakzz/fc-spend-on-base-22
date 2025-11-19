@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY
+const SEAPORT_CONTRACT = '0x0000000000000068F116a894984e2DB1123eB395'
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -32,7 +34,7 @@ export async function GET(request: NextRequest) {
   try {
     console.log('[API] Fetching wallet stats for:', address)
     
-    const transactionsResponse = await fetch(ALCHEMY_URL, {
+    const outgoingNFTResponse = await fetch(ALCHEMY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -41,56 +43,60 @@ export async function GET(request: NextRequest) {
         method: 'alchemy_getAssetTransfers',
         params: [{
           fromAddress: address,
-          category: ['external', 'erc721', 'erc1155'],
+          category: ['erc721', 'erc1155'],
           withMetadata: true,
           maxCount: '0x3e8',
         }]
       })
     })
 
-    const transactionsData = await transactionsResponse.json()
-    const transfers = transactionsData.result?.transfers || []
+    const outgoingNFTData = await outgoingNFTResponse.json()
+    const outgoingNFTs = outgoingNFTData.result?.transfers || []
 
-    let totalFees = 0
-    let totalNFTMints = 0
-    let totalNFTPurchases = 0
-    
-    for (const transfer of transfers) {
-      // Calculate gas fees
-      if (transfer.metadata?.gasPrice && transfer.metadata?.gasUsed) {
-        const gasFee = (parseInt(transfer.metadata.gasPrice, 16) * parseInt(transfer.metadata.gasUsed, 16)) / 1e18
-        totalFees += gasFee
-      } else {
-        totalFees += 0.0001 // Estimated average gas fee
-      }
-
-      if (transfer.category === 'erc721' || transfer.category === 'erc1155') {
-        const transferValue = parseFloat(transfer.value || '0')
-        const rawInput = transfer.rawContract?.rawInput || ''
-        
-        const isMintFunction = rawInput.toLowerCase().includes('mint') || 
-                              rawInput.startsWith('0x40c10f19') || // mint(address,uint256)
-                              rawInput.startsWith('0xa0712d68') || // mint(uint256)
-                              rawInput.startsWith('0x6a627842')    // mint(address)
-        
-        if (isMintFunction) {
-          // It's a mint by function name - count the value sent (regardless of amount)
-          totalNFTMints += transferValue
-        } else if (transferValue > 0) {
-          // Has value but no mint function - still count as mint
-          totalNFTMints += transferValue
-        }
-        // If no value and no mint function, it's likely a transfer (ignore)
-      }
-    }
-
-    // Fetch incoming transfers for sales
-    const incomingResponse = await fetch(ALCHEMY_URL, {
+    const incomingNFTResponse = await fetch(ALCHEMY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 2,
+        method: 'alchemy_getAssetTransfers',
+        params: [{
+          toAddress: address,
+          category: ['erc721', 'erc1155'],
+          withMetadata: true,
+          maxCount: '0x3e8',
+        }]
+      })
+    })
+
+    const incomingNFTData = await incomingNFTResponse.json()
+    const incomingNFTs = incomingNFTData.result?.transfers || []
+
+    const ethTransactionsResponse = await fetch(ALCHEMY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'alchemy_getAssetTransfers',
+        params: [{
+          fromAddress: address,
+          category: ['external'],
+          withMetadata: true,
+          maxCount: '0x3e8',
+        }]
+      })
+    })
+
+    const ethTransactionsData = await ethTransactionsResponse.json()
+    const ethTransactions = ethTransactionsData.result?.transfers || []
+
+    const incomingEthResponse = await fetch(ALCHEMY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 4,
         method: 'alchemy_getAssetTransfers',
         params: [{
           toAddress: address,
@@ -101,15 +107,86 @@ export async function GET(request: NextRequest) {
       })
     })
 
-    const incomingData = await incomingResponse.json()
-    const incomingTransfers = incomingData.result?.transfers || []
-    
+    const incomingEthData = await incomingEthResponse.json()
+    const incomingEthTransfers = incomingEthData.result?.transfers || []
+
+    let totalFees = 0
+    let totalNFTMints = 0
+    let totalNFTPurchases = 0
     let totalNFTSales = 0
-    
-    for (const transfer of incomingTransfers) {
-      const transferValue = parseFloat(transfer.value || '0')
-      if (transferValue > 0) {
-        totalNFTSales += transferValue
+
+    const allTransactions = [...outgoingNFTs, ...ethTransactions]
+    for (const transfer of allTransactions) {
+      if (transfer.metadata?.gasPrice && transfer.metadata?.gasUsed) {
+        const gasFee = (parseInt(transfer.metadata.gasPrice, 16) * parseInt(transfer.metadata.gasUsed, 16)) / 1e18
+        totalFees += gasFee
+      } else {
+        totalFees += 0.0001
+      }
+    }
+
+    for (const transfer of incomingNFTs) {
+      const fromAddress = transfer.from?.toLowerCase() || ''
+      
+      // Skip Seaport purchases
+      if (fromAddress === SEAPORT_CONTRACT.toLowerCase()) {
+        continue
+      }
+      
+      // Check if NFT came from zero address (minted)
+      if (fromAddress === ZERO_ADDRESS.toLowerCase()) {
+        const txHash = transfer.hash
+        // Find the corresponding ETH transaction for this mint
+        const ethPayment = ethTransactions.find(eth => eth.hash === txHash)
+        if (ethPayment) {
+          totalNFTMints += parseFloat(ethPayment.value || '0')
+        }
+      }
+    }
+
+    for (const transfer of incomingNFTs) {
+      const fromAddress = transfer.from?.toLowerCase() || ''
+      
+      if (fromAddress === SEAPORT_CONTRACT.toLowerCase()) {
+        const txHash = transfer.hash
+        const ethPayment = ethTransactions.find(eth => eth.hash === txHash)
+        if (ethPayment) {
+          totalNFTPurchases += parseFloat(ethPayment.value || '0')
+        }
+      }
+    }
+
+    for (const transfer of outgoingNFTs) {
+      const toAddress = transfer.to?.toLowerCase() || ''
+      
+      if (toAddress === SEAPORT_CONTRACT.toLowerCase()) {
+        const txHash = transfer.hash
+        const ethReceived = incomingEthTransfers.find(eth => eth.hash === txHash)
+        if (ethReceived) {
+          totalNFTSales += parseFloat(ethReceived.value || '0')
+        }
+      }
+    }
+
+    for (const transfer of ethTransactions) {
+      const toAddress = transfer.to?.toLowerCase() || ''
+      const value = parseFloat(transfer.value || '0')
+      const rawInput = transfer.rawContract?.rawInput || ''
+      
+      if (toAddress === SEAPORT_CONTRACT.toLowerCase()) {
+        continue
+      }
+      
+      const isMintFunction = rawInput.toLowerCase().includes('mint') || 
+                            rawInput.startsWith('0x40c10f19') ||
+                            rawInput.startsWith('0xa0712d68') ||
+                            rawInput.startsWith('0x6a627842')
+      
+      if (isMintFunction || value > 0) {
+        const nftReceived = incomingNFTs.find(nft => nft.hash === transfer.hash)
+        if (nftReceived) {
+          totalNFTMints += value
+        }
       }
     }
     

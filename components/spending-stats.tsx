@@ -38,25 +38,25 @@ export function SpendingStats({ stats, usdMode, walletAddress }: SpendingStatsPr
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-center gap-2 pb-2 border-b border-border">
-        <svg width="16" height="16" viewBox="0 0 111 111" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <div className="space-y-3">
+      <div className="flex items-center justify-center gap-2 pb-1.5 border-b border-border">
+        <svg width="14" height="14" viewBox="0 0 111 111" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M54.921 110.034C85.359 110.034 110.034 85.402 110.034 55.017C110.034 24.6319 85.359 0 54.921 0C26.0432 0 2.35281 22.1714 0 50.3923H72.8467V59.6416H3.9565e-07C2.35281 87.8625 26.0432 110.034 54.921 110.034Z" fill="#0052FF"/>
         </svg>
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
           Base
         </span>
       </div>
 
-      <div className="space-y-1.5">
-        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+      <div className="space-y-1">
+        <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
           Total Gas Fees
         </h3>
         <div className="flex items-baseline gap-2">
-          <span className="text-xl font-bold text-foreground">
+          <span className="text-base font-bold text-foreground">
             {formatETH(stats.totalFees)}
           </span>
-          <span className="text-base text-muted-foreground">
+          <span className="text-sm text-muted-foreground">
             {formatUSD(stats.totalFees)}
           </span>
         </div>
@@ -64,15 +64,15 @@ export function SpendingStats({ stats, usdMode, walletAddress }: SpendingStatsPr
 
       <div className="border-t border-border" />
 
-      <div className="space-y-1.5">
-        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+      <div className="space-y-1">
+        <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
           Total NFT Mints
         </h3>
         <div className="flex items-baseline gap-2">
-          <span className="text-xl font-bold text-foreground">
+          <span className="text-base font-bold text-foreground">
             {formatETH(stats.totalNFTMints)}
           </span>
-          <span className="text-base text-muted-foreground">
+          <span className="text-sm text-muted-foreground">
             {formatUSD(stats.totalNFTMints)}
           </span>
         </div>
@@ -80,15 +80,15 @@ export function SpendingStats({ stats, usdMode, walletAddress }: SpendingStatsPr
 
       <div className="border-t border-border" />
 
-      <div className="space-y-1.5">
-        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+      <div className="space-y-1">
+        <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
           Total NFT Purchases
         </h3>
         <div className="flex items-baseline gap-2">
-          <span className="text-xl font-bold text-foreground">
+          <span className="text-base font-bold text-foreground">
             {formatETH(stats.totalNFTPurchases)}
           </span>
-          <span className="text-base text-muted-foreground">
+          <span className="text-sm text-muted-foreground">
             {formatUSD(stats.totalNFTPurchases)}
           </span>
         </div>
@@ -96,15 +96,15 @@ export function SpendingStats({ stats, usdMode, walletAddress }: SpendingStatsPr
 
       <div className="border-t border-border" />
 
-      <div className="space-y-1.5">
-        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+      <div className="space-y-1">
+        <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
           Total NFT Sales
         </h3>
         <div className="flex items-baseline gap-2">
-          <span className="text-xl font-bold text-green-600 dark:text-green-400">
+          <span className="text-base font-bold text-green-600 dark:text-green-400">
             {formatETH(stats.totalNFTSales)}
           </span>
-          <span className="text-base text-muted-foreground">
+          <span className="text-sm text-muted-foreground">
             {formatUSD(stats.totalNFTSales)}
           </span>
         </div>
