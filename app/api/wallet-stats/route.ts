@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
       if (fromAddress === ZERO_ADDRESS.toLowerCase()) {
         const txHash = transfer.hash
         // Find the corresponding ETH transaction for this mint
-        const ethPayment = ethTransactions.find(eth => eth.hash === txHash)
+        const ethPayment = ethTransactions.find((eth: any) => eth.hash === txHash)
         if (ethPayment) {
           totalNFTMints += parseFloat(ethPayment.value || '0')
         }
@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
       
       if (fromAddress === SEAPORT_CONTRACT.toLowerCase()) {
         const txHash = transfer.hash
-        const ethPayment = ethTransactions.find(eth => eth.hash === txHash)
+        const ethPayment = ethTransactions.find((eth: any) => eth.hash === txHash)
         if (ethPayment) {
           totalNFTPurchases += parseFloat(ethPayment.value || '0')
         }
@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
       
       if (toAddress === SEAPORT_CONTRACT.toLowerCase()) {
         const txHash = transfer.hash
-        const ethReceived = incomingEthTransfers.find(eth => eth.hash === txHash)
+        const ethReceived = incomingEthTransfers.find((eth: any) => eth.hash === txHash)
         if (ethReceived) {
           totalNFTSales += parseFloat(ethReceived.value || '0')
         }
