@@ -372,7 +372,7 @@ export default function Home() {
                 {checkedWallets.map((wallet) => (
                   <Card
                     key={wallet.address}
-                    className={`p-3 cursor-pointer transition-colors h-[72px] flex items-center justify-between ${
+                    className={`relative p-3 cursor-pointer transition-colors h-[72px] flex items-center ${
                       currentAddress === wallet.address
                         ? 'ring-2 ring-primary'
                         : 'hover:bg-accent'
@@ -398,9 +398,9 @@ export default function Home() {
                         e.stopPropagation()
                         removeCheckedWallet(wallet.address)
                       }}
-                      className="p-1 hover:bg-destructive/10 rounded-full transition-colors"
+                      className="absolute top-2 right-2 p-0.5"
                     >
-                      <X className="h-4 w-4 text-destructive" />
+                      <X className="h-4 w-4 text-gray-400" />
                     </button>
                   </Card>
                 ))}
