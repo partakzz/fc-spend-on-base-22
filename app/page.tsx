@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { SpendingStats } from "@/components/spending-stats"
-import { fetchWalletStats } from "@/lib/wallet-stats"
 
 export default function Home() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
@@ -20,6 +19,32 @@ export default function Home() {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  const fetchStats = async (address: string) => {
+    try {
+      const response = await fetch(`/api/wallet-stats?address=${address}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch wallet stats')
+      }
+      
+      const data = await response.json()
+      
+      return {
+        totalFees: BigInt(Math.floor(parseFloat(data.totalFees) * 1e18)),
+        totalNFTPurchases: BigInt(Math.floor(parseFloat(data.totalNFTPurchases) * 1e18)),
+        totalNFTSales: BigInt(Math.floor(parseFloat(data.totalNFTSales) * 1e18)),
+      }
+    } catch (error) {
+      console.error('Error fetching wallet stats:', error)
+      // Return demo data on error
+      return {
+        totalFees: BigInt(Math.floor(0.05 * 1e18)),
+        totalNFTPurchases: BigInt(Math.floor(1.2 * 1e18)),
+        totalNFTSales: BigInt(Math.floor(2.5 * 1e18)),
+      }
+    }
+  }
 
   const connectWallet = async () => {
     try {
@@ -49,7 +74,7 @@ export default function Home() {
       
       setWalletAddress(address)
       
-      const walletStats = await fetchWalletStats(address)
+      const walletStats = await fetchStats(address)
       setStats(walletStats)
       
     } catch (error) {
@@ -59,7 +84,7 @@ export default function Home() {
       const mockAddress = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
       setWalletAddress(mockAddress)
       
-      const walletStats = await fetchWalletStats(mockAddress)
+      const walletStats = await fetchStats(mockAddress)
       setStats(walletStats)
     } finally {
       setIsLoading(false)

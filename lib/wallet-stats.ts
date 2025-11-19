@@ -36,7 +36,7 @@ export async function fetchHistoricalEthPrice(timestamp: number): Promise<number
     const data = await response.json()
     return data.market_data?.current_price?.usd || 2800
   } catch (error) {
-    console.error('[v0] Error fetching historical price:', error)
+    console.error('Error fetching historical price:', error)
     return 2800
   }
 }
