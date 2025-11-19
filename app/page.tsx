@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { SpendingStats } from '@/components/spending-stats'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { X } from 'lucide-react'
 import sdk from '@farcaster/frame-sdk'
 
 interface CheckedWallet {
@@ -50,11 +51,6 @@ export default function Home() {
   const [sdkReady, setSdkReady] = useState(false)
   const [checkedWallets, setCheckedWallets] = useState<CheckedWallet[]>([])
   const [rateLimitError, setRateLimitError] = useState<string | null>(null)
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
-  const [showDropdown, setShowDropdown] = useState(false)
-  const [isSearching, setIsSearching] = useState(false)
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const initSDK = async () => {
@@ -94,109 +90,6 @@ export default function Home() {
       })
     }
   }, [sdkReady])
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  useEffect(() => {
-    if (checkAddress.length < 2) {
-      setSearchResults([])
-      setShowDropdown(false)
-      return
-    }
-
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current)
-    }
-
-    setIsSearching(true)
-
-    searchTimeoutRef.current = setTimeout(async () => {
-      try {
-        // Search by address
-        if (checkAddress.startsWith('0x') && checkAddress.length > 10) {
-          const response = await fetch(
-            `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${checkAddress}`,
-            {
-              headers: {
-                'accept': 'application/json',
-                'api_key': 'NEYNAR_API_DOCS'
-              }
-            }
-          )
-          
-          const data = await response.json()
-
-          if (data && Object.keys(data).length > 0) {
-            const users = Object.values(data).flat().map((user: any) => ({
-              fid: user.fid,
-              username: user.username,
-              display_name: user.display_name || user.username,
-              pfp_url: user.pfp_url,
-              custody_address: user.custody_address,
-              verified_addresses: user.verified_addresses
-            }))
-            
-            setSearchResults(users as SearchResult[])
-            setShowDropdown(users.length > 0)
-          } else {
-            setSearchResults([])
-            setShowDropdown(false)
-          }
-        } else {
-          // Search by username
-          const response = await fetch(
-            `https://api.neynar.com/v2/farcaster/user/search?q=${encodeURIComponent(checkAddress)}&limit=5`,
-            {
-              headers: {
-                'accept': 'application/json',
-                'api_key': 'NEYNAR_API_DOCS'
-              }
-            }
-          )
-          
-          const data = await response.json()
-
-          if (data.result?.users && data.result.users.length > 0) {
-            const users = data.result.users.map((user: any) => ({
-              fid: user.fid,
-              username: user.username,
-              display_name: user.display_name || user.username,
-              pfp_url: user.pfp_url,
-              custody_address: user.custody_address,
-              verified_addresses: user.verified_addresses
-            }))
-            
-            setSearchResults(users)
-            setShowDropdown(users.length > 0)
-          } else {
-            setSearchResults([])
-            setShowDropdown(false)
-          }
-        }
-      } catch (error) {
-        console.error('Error searching Farcaster users:', error)
-        setSearchResults([])
-        setShowDropdown(false)
-      } finally {
-        setIsSearching(false)
-      }
-    }, 300)
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current)
-      }
-    }
-  }, [checkAddress])
 
   const fetchStats = async (address: string) => {
     try {
@@ -354,71 +247,6 @@ export default function Home() {
     }
   }
 
-  const handleSearchInput = async (value: string) => {
-    setCheckAddress(value)
-    setRateLimitError(null)
-  }
-
-  const getPreferredBaseAddress = (user: SearchResult): string => {
-    return user.custody_address || user.verified_addresses?.eth_addresses?.[0] || ''
-  }
-
-  const handleSelectSearchResult = async (user: SearchResult) => {
-    const address = getPreferredBaseAddress(user)
-    
-    if (!address) {
-      alert('No wallet address found for this user')
-      return
-    }
-
-    setCheckAddress(address)
-    setShowDropdown(false)
-    setSearchResults([])
-
-    // Check if already in the list
-    if (checkedWallets.some(w => w.address.toLowerCase() === address.toLowerCase())) {
-      switchToWallet(address)
-      setCheckAddress('')
-      return
-    }
-    
-    // Check rate limit
-    if (!checkRateLimit()) {
-      setRateLimitError('Max check limit 5 wallets 24h')
-      return
-    }
-    
-    setIsLoading(true)
-    
-    try {
-      const newWallet: CheckedWallet = {
-        address: address,
-        username: user.username,
-        pfpUrl: user.pfp_url || '',
-        timestamp: Date.now()
-      }
-      
-      const updatedWallets = [...checkedWallets, newWallet]
-      setCheckedWallets(updatedWallets)
-      localStorage.setItem('checked_wallets', JSON.stringify(updatedWallets))
-      
-      incrementRateLimit()
-      
-      setCurrentAddress(address)
-      setStats(null)
-      
-      const walletStats = await fetchStats(address)
-      setStats(walletStats)
-      
-      setCheckAddress('')
-    } catch (error) {
-      console.error('Error checking address:', error)
-      alert('Failed to check address')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   const handleCheckAddress = async () => {
     setRateLimitError(null)
     
@@ -485,6 +313,17 @@ export default function Home() {
     setStats(walletStats)
   }
 
+  const removeCheckedWallet = (address: string) => {
+    const updatedWallets = checkedWallets.filter(w => w.address !== address)
+    setCheckedWallets(updatedWallets)
+    localStorage.setItem('checked_wallets', JSON.stringify(updatedWallets))
+    
+    // If we're removing the currently active wallet, switch to connected wallet
+    if (currentAddress === address && connectedWallet) {
+      switchToWallet(connectedWallet)
+    }
+  }
+
   const toggleUsdMode = () => {
     setUsdMode(prev => prev === 'at_time' ? 'now' : 'at_time')
   }
@@ -533,14 +372,16 @@ export default function Home() {
                 {checkedWallets.map((wallet) => (
                   <Card
                     key={wallet.address}
-                    className={`p-3 cursor-pointer transition-colors h-[72px] flex items-center gap-3 border-b last:border-b-0 ${
+                    className={`p-3 cursor-pointer transition-colors h-[72px] flex items-center justify-between ${
                       currentAddress === wallet.address
                         ? 'ring-2 ring-primary'
                         : 'hover:bg-accent'
                     }`}
-                    onClick={() => switchToWallet(wallet.address)}
                   >
-                    <div className="flex items-center gap-3">
+                    <div 
+                      className="flex items-center gap-3 flex-1"
+                      onClick={() => switchToWallet(wallet.address)}
+                    >
                       <Avatar className="h-10 w-10">
                         <AvatarImage src={wallet.pfpUrl || '/placeholder.svg'} alt={wallet.username} />
                         <AvatarFallback>{wallet.pfpUrl ? wallet.username.slice(0, 2).toUpperCase() : '👤'}</AvatarFallback>
@@ -552,62 +393,36 @@ export default function Home() {
                         </span>
                       </div>
                     </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        removeCheckedWallet(wallet.address)
+                      }}
+                      className="p-1 hover:bg-destructive/10 rounded-full transition-colors"
+                    >
+                      <X className="h-4 w-4 text-destructive" />
+                    </button>
                   </Card>
                 ))}
               </div>
             )}
 
-            <div ref={dropdownRef} className="relative">
+            <div className="relative">
               <Card className="p-3 h-[72px] flex items-center">
                 <div className="flex gap-2 w-full">
-                  <div className="relative flex-1">
-                    <Input
-                      type="text"
-                      placeholder="Address or username"
-                      value={checkAddress}
-                      onChange={(e) => handleSearchInput(e.target.value)}
-                      className="w-full"
-                      disabled={isLoading}
-                    />
-                    {isSearching && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
-                      </div>
-                    )}
-                  </div>
+                  <Input
+                    type="text"
+                    placeholder="Enter wallet address (0x...)"
+                    value={checkAddress}
+                    onChange={(e) => setCheckAddress(e.target.value)}
+                    className="w-full"
+                    disabled={isLoading}
+                  />
                   <Button onClick={handleCheckAddress} className="whitespace-nowrap" disabled={isLoading}>
                     {isLoading ? 'Checking...' : 'Check'}
                   </Button>
                 </div>
               </Card>
-
-              {showDropdown && searchResults.length > 0 && (
-                <Card className="absolute top-full mt-2 w-full z-50 max-h-[300px] overflow-y-auto">
-                  {searchResults.map((user) => (
-                    <button
-                      key={user.fid}
-                      onClick={() => handleSelectSearchResult(user)}
-                      className="w-full text-left p-3 hover:bg-accent transition-colors border-b last:border-b-0 flex items-center gap-3"
-                    >
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={user.pfp_url || '/placeholder.svg'} alt={user.username} />
-                        <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{user.display_name}</p>
-                        <p className="text-xs text-muted-foreground">@{user.username}</p>
-                      </div>
-                      {getPreferredBaseAddress(user) && (
-                        <div className="text-right">
-                          <p className="text-xs text-muted-foreground font-mono">
-                            {getPreferredBaseAddress(user).slice(0, 6)}...{getPreferredBaseAddress(user).slice(-4)}
-                          </p>
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </Card>
-              )}
               
               {rateLimitError && (
                 <p className="text-sm text-red-500 mt-2">{rateLimitError}</p>
