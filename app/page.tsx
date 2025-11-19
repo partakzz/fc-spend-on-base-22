@@ -110,27 +110,43 @@ export default function Home() {
             username = context.user.username || context.user.displayName || `fid:${context.user.fid}`
             pfpUrl = context.user.pfpUrl || ""
             
-            console.log("[v0] Got Farcaster user:", username)
+            console.log("[v0] Full Farcaster context:", JSON.stringify(context, null, 2))
+            
+            if (context.user.verifications) {
+              const verifications = context.user.verifications as string[]
+              console.log("[v0] Found verified addresses:", verifications)
+              
+              verifications.forEach((address, index) => {
+                connectedWallets.push({
+                  address,
+                  username: index === 0 ? username : `${username} ${index + 1}`,
+                  pfpUrl,
+                  isActive: index === 0
+                })
+              })
+            }
           }
           
-          const addresses = await sdk.wallet.ethProvider.request({
-            method: 'eth_requestAccounts',
-          }) as string[]
-          
-          if (addresses && addresses.length > 0) {
-            console.log("[v0] Connected to Farcaster wallets:", addresses)
+          if (connectedWallets.length === 0) {
+            const addresses = await sdk.wallet.ethProvider.request({
+              method: 'eth_requestAccounts',
+            }) as string[]
             
-            addresses.forEach((address, index) => {
-              connectedWallets.push({
-                address,
-                username: `${username} ${index + 1}`,
-                pfpUrl,
-                isActive: index === 0 // First wallet is active
+            if (addresses && addresses.length > 0) {
+              console.log("[v0] Connected to Farcaster wallets via eth_requestAccounts:", addresses)
+              
+              addresses.forEach((address, index) => {
+                connectedWallets.push({
+                  address,
+                  username: index === 0 ? username : `${username} ${index + 1}`,
+                  pfpUrl,
+                  isActive: index === 0
+                })
               })
-            })
+            }
           }
         } catch (error) {
-          console.log("[v0] Farcaster wallet not available, trying fallback")
+          console.log("[v0] Farcaster wallet error:", error)
         }
       }
       
