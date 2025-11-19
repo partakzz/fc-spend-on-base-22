@@ -183,7 +183,7 @@ export async function GET(request: NextRequest) {
                             rawInput.startsWith('0x6a627842')
       
       if (isMintFunction || value > 0) {
-        const nftReceived = incomingNFTs.find(nft => nft.hash === transfer.hash)
+        const nftReceived = incomingNFTs.find((nft: any) => nft.hash === transfer.hash)
         if (nftReceived) {
           totalNFTMints += value
         }
