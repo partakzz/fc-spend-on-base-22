@@ -1,11 +1,11 @@
-"use client"
+'use client'
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { SpendingStats } from "@/components/spending-stats"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import sdk from "@farcaster/frame-sdk"
+import { useState, useEffect } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { SpendingStats } from '@/components/spending-stats'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import sdk from '@farcaster/frame-sdk'
 
 interface WalletInfo {
   address: string
@@ -36,9 +36,8 @@ export default function Home() {
       try {
         await sdk.actions.ready()
         setSdkReady(true)
-        console.log("[v0] Farcaster SDK initialized successfully")
       } catch (error) {
-        console.error("[v0] Failed to initialize Farcaster SDK:", error)
+        console.error('Failed to initialize Farcaster SDK:', error)
         setSdkReady(true)
       }
     }
@@ -99,8 +98,8 @@ export default function Home() {
       setIsLoading(true)
       
       const connectedWallets: WalletInfo[] = []
-      let username = "Anonymous"
-      let pfpUrl = ""
+      let username = 'Anonymous'
+      let pfpUrl = ''
       
       if (sdkReady) {
         try {
@@ -108,37 +107,36 @@ export default function Home() {
           
           if (context?.user) {
             username = context.user.username || context.user.displayName || `fid:${context.user.fid}`
-            pfpUrl = context.user.pfpUrl || ""
-            
-            console.log("[v0] Full Farcaster context:", JSON.stringify(context, null, 2))
-            
-            if (context.user.verifications) {
-              const verifications = context.user.verifications as string[]
-              console.log("[v0] Found verified addresses:", verifications)
-              
-              verifications.forEach((address, index) => {
-                connectedWallets.push({
-                  address,
-                  username: index === 0 ? username : `${username} ${index + 1}`,
-                  pfpUrl,
-                  isActive: index === 0
-                })
-              })
-            }
+            pfpUrl = context.user.pfpUrl || ''
           }
           
+          // Get all verified ETH addresses
+          const contextAny = context as any
+          if (contextAny?.verified_addresses?.eth_addresses) {
+            const addresses = contextAny.verified_addresses.eth_addresses
+            console.log('[v0] Found verified addresses:', addresses)
+            
+            addresses.forEach((address: string, index: number) => {
+              connectedWallets.push({
+                address,
+                username,
+                pfpUrl,
+                isActive: index === 0
+              })
+            })
+          }
+          
+          // Fallback: try eth_requestAccounts if no verified addresses
           if (connectedWallets.length === 0) {
             const addresses = await sdk.wallet.ethProvider.request({
               method: 'eth_requestAccounts',
             }) as string[]
             
             if (addresses && addresses.length > 0) {
-              console.log("[v0] Connected to Farcaster wallets via eth_requestAccounts:", addresses)
-              
               addresses.forEach((address, index) => {
                 connectedWallets.push({
                   address,
-                  username: index === 0 ? username : `${username} ${index + 1}`,
+                  username,
                   pfpUrl,
                   isActive: index === 0
                 })
@@ -146,7 +144,7 @@ export default function Home() {
             }
           }
         } catch (error) {
-          console.log("[v0] Farcaster wallet error:", error)
+          console.log('Farcaster wallet error:', error)
         }
       }
       
@@ -162,7 +160,7 @@ export default function Home() {
               connectedWallets.push({
                 address,
                 username: `Wallet ${index + 1}`,
-                pfpUrl: "",
+                pfpUrl: '',
                 isActive: index === 0
               })
             })
@@ -174,9 +172,9 @@ export default function Home() {
       
       if (connectedWallets.length === 0) {
         connectedWallets.push({
-          address: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-          username: "Demo Wallet",
-          pfpUrl: "",
+          address: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+          username: 'Demo Wallet',
+          pfpUrl: '',
           isActive: true
         })
       }
@@ -197,9 +195,9 @@ export default function Home() {
       console.error('Error connecting wallet:', error)
       
       const demoWallet = {
-        address: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-        username: "Demo User",
-        pfpUrl: "",
+        address: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+        username: 'Demo User',
+        pfpUrl: '',
         isActive: true
       }
       
@@ -218,7 +216,7 @@ export default function Home() {
     setSelectedWallet(address)
     localStorage.setItem('selected_wallet', address)
     
-    setStats(null) // Show loading
+    setStats(null)
     const walletStats = await fetchStats(address)
     setStats(walletStats)
   }
@@ -256,7 +254,7 @@ export default function Home() {
               >
                 <div className="flex items-center gap-2">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={wallet.pfpUrl || "/placeholder.svg"} alt={wallet.username} />
+                    <AvatarImage src={wallet.pfpUrl || '/placeholder.svg'} alt={wallet.username} />
                     <AvatarFallback className="text-xs">{wallet.username.slice(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col min-w-0 flex-1">
