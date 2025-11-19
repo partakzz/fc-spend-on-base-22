@@ -8,6 +8,18 @@ import { SpendingStats } from '@/components/spending-stats'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import sdk from '@farcaster/frame-sdk'
 
+interface CheckedWallet {
+  address: string
+  username: string
+  pfpUrl: string
+  timestamp: number
+}
+
+interface RateLimitData {
+  count: number
+  resetTime: number
+}
+
 export default function Home() {
   const [connectedWallet, setConnectedWallet] = useState<string | null>(null)
   const [userProfile, setUserProfile] = useState<{
@@ -25,6 +37,8 @@ export default function Home() {
   const [currentAddress, setCurrentAddress] = useState<string | null>(null)
   const [usdMode, setUsdMode] = useState<'at_time' | 'now'>('now')
   const [sdkReady, setSdkReady] = useState(false)
+  const [checkedWallets, setCheckedWallets] = useState<CheckedWallet[]>([])
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null)
 
   useEffect(() => {
     const initSDK = async () => {
@@ -45,6 +59,7 @@ export default function Home() {
     
     const savedWallet = localStorage.getItem('connected_wallet')
     const savedProfile = localStorage.getItem('user_profile')
+    const savedCheckedWallets = localStorage.getItem('checked_wallets')
     
     if (savedWallet) {
       setConnectedWallet(savedWallet)
@@ -52,6 +67,10 @@ export default function Home() {
       
       if (savedProfile) {
         setUserProfile(JSON.parse(savedProfile))
+      }
+      
+      if (savedCheckedWallets) {
+        setCheckedWallets(JSON.parse(savedCheckedWallets))
       }
       
       fetchStats(savedWallet).then(walletStats => {
@@ -84,6 +103,58 @@ export default function Home() {
         totalNFTPurchases: BigInt(Math.floor(1.2 * 1e18)),
         totalNFTSales: BigInt(Math.floor(2.5 * 1e18)),
       }
+    }
+  }
+
+  const checkRateLimit = (): boolean => {
+    const rateLimitData = localStorage.getItem('rate_limit')
+    const now = Date.now()
+    
+    if (!rateLimitData) {
+      const newRateLimit: RateLimitData = {
+        count: 0,
+        resetTime: now + 24 * 60 * 60 * 1000 // 24 hours from now
+      }
+      localStorage.setItem('rate_limit', JSON.stringify(newRateLimit))
+      return true
+    }
+    
+    const rateLimit: RateLimitData = JSON.parse(rateLimitData)
+    
+    // Reset if 24 hours have passed
+    if (now > rateLimit.resetTime) {
+      const newRateLimit: RateLimitData = {
+        count: 0,
+        resetTime: now + 24 * 60 * 60 * 1000
+      }
+      localStorage.setItem('rate_limit', JSON.stringify(newRateLimit))
+      return true
+    }
+    
+    // Check if limit exceeded
+    if (rateLimit.count >= 5) {
+      return false
+    }
+    
+    return true
+  }
+
+  const incrementRateLimit = () => {
+    const rateLimitData = localStorage.getItem('rate_limit')
+    if (!rateLimitData) return
+    
+    const rateLimit: RateLimitData = JSON.parse(rateLimitData)
+    rateLimit.count += 1
+    localStorage.setItem('rate_limit', JSON.stringify(rateLimit))
+  }
+
+  const fetchFarcasterProfile = async (address: string): Promise<{ username: string; pfpUrl: string } | null> => {
+    try {
+      // This would require a Neynar or other Farcaster API integration
+      // For now, return null to show address only
+      return null
+    } catch (error) {
+      return null
     }
   }
 
@@ -165,15 +236,70 @@ export default function Home() {
   }
 
   const handleCheckAddress = async () => {
+    setRateLimitError(null)
+    
     if (!checkAddress || !/^0x[a-fA-F0-9]{40}$/.test(checkAddress)) {
       alert('Please enter a valid Ethereum address')
       return
     }
     
-    setCurrentAddress(checkAddress)
+    // Check if already in the list
+    if (checkedWallets.some(w => w.address.toLowerCase() === checkAddress.toLowerCase())) {
+      // Just switch to this wallet
+      switchToWallet(checkAddress)
+      setCheckAddress('')
+      return
+    }
+    
+    // Check rate limit
+    if (!checkRateLimit()) {
+      setRateLimitError('Max check limit 5 wallets 24h')
+      return
+    }
+    
+    setIsLoading(true)
+    
+    try {
+      // Fetch Farcaster profile if available
+      const profile = await fetchFarcasterProfile(checkAddress)
+      
+      const newWallet: CheckedWallet = {
+        address: checkAddress,
+        username: profile?.username || `${checkAddress.slice(0, 6)}...${checkAddress.slice(-4)}`,
+        pfpUrl: profile?.pfpUrl || '',
+        timestamp: Date.now()
+      }
+      
+      const updatedWallets = [...checkedWallets, newWallet]
+      setCheckedWallets(updatedWallets)
+      localStorage.setItem('checked_wallets', JSON.stringify(updatedWallets))
+      
+      // Increment rate limit
+      incrementRateLimit()
+      
+      // Switch to the new wallet
+      setCurrentAddress(checkAddress)
+      setStats(null)
+      
+      const walletStats = await fetchStats(checkAddress)
+      setStats(walletStats)
+      
+      setCheckAddress('')
+    } catch (error) {
+      console.error('Error checking address:', error)
+      alert('Failed to check address')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const switchToWallet = async (address: string) => {
+    if (currentAddress === address) return
+    
+    setCurrentAddress(address)
     setStats(null)
     
-    const walletStats = await fetchStats(checkAddress)
+    const walletStats = await fetchStats(address)
     setStats(walletStats)
   }
 
@@ -192,13 +318,20 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-6">
       <div className="w-full max-w-md space-y-6">
-        <h1 className="text-5xl font-bold text-center text-primary">
-          You Spend
+        <h1 className="text-lg font-bold text-center text-primary">
+          How much you spent......
         </h1>
 
         {connectedWallet ? (
           <>
-            <Card className="p-4">
+            <Card 
+              className={`p-4 cursor-pointer transition-colors ${
+                currentAddress === connectedWallet 
+                  ? 'ring-2 ring-primary' 
+                  : 'hover:bg-accent'
+              }`}
+              onClick={() => switchToWallet(connectedWallet)}
+            >
               <div className="flex items-center gap-3">
                 <Avatar className="h-12 w-12">
                   <AvatarImage src={userProfile?.pfpUrl || '/placeholder.svg'} alt={userProfile?.username || 'User'} />
@@ -213,6 +346,37 @@ export default function Home() {
               </div>
             </Card>
 
+            {checkedWallets.length > 0 && (
+              <div className="space-y-2">
+                {checkedWallets.map((wallet) => (
+                  <Card
+                    key={wallet.address}
+                    className={`p-4 cursor-pointer transition-colors ${
+                      currentAddress === wallet.address
+                        ? 'ring-2 ring-primary'
+                        : 'hover:bg-accent'
+                    }`}
+                    onClick={() => switchToWallet(wallet.address)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={wallet.pfpUrl || '/placeholder.svg'} alt={wallet.username} />
+                        <AvatarFallback>
+                          {wallet.pfpUrl ? wallet.username.slice(0, 2).toUpperCase() : '👤'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col">
+                        <span className="font-semibold">{wallet.username}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}
+                        </span>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+
             <Card className="p-4">
               <div className="flex gap-2">
                 <Input
@@ -221,29 +385,24 @@ export default function Home() {
                   value={checkAddress}
                   onChange={(e) => setCheckAddress(e.target.value)}
                   className="flex-1"
+                  disabled={isLoading}
                 />
-                <Button onClick={handleCheckAddress} className="whitespace-nowrap">
-                  Check
+                <Button onClick={handleCheckAddress} className="whitespace-nowrap" disabled={isLoading}>
+                  {isLoading ? 'Checking...' : 'Check'}
                 </Button>
               </div>
+              {rateLimitError && (
+                <p className="text-sm text-red-500 mt-2">{rateLimitError}</p>
+              )}
             </Card>
 
-            <div className="flex justify-center">
-              <Button 
-                onClick={toggleUsdMode}
-                variant="outline"
-                size="lg"
-                className="min-w-[200px]"
-              >
-                {usdMode === 'at_time' ? 'Time of Txn' : 'Current'}
-              </Button>
-            </div>
 
             <Card className="p-4">
               {stats ? (
                 <SpendingStats 
                   stats={stats}
                   usdMode={usdMode}
+                  toggleUsdMode={toggleUsdMode}
                   walletAddress={currentAddress || connectedWallet}
                 />
               ) : (
