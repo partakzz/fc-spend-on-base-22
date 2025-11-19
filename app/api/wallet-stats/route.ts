@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
       { 
         error: 'API key not configured',
         totalFees: '0.05',
+        totalNFTMints: '0.3',
         totalNFTPurchases: '1.2',
         totalNFTSales: '2.5',
       },
@@ -31,8 +32,7 @@ export async function GET(request: NextRequest) {
   try {
     console.log('[API] Fetching wallet stats for:', address)
     
-    // Fetch outgoing transfers
-    const outgoingResponse = await fetch(ALCHEMY_URL, {
+    const transactionsResponse = await fetch(ALCHEMY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -48,23 +48,43 @@ export async function GET(request: NextRequest) {
       })
     })
 
-    const outgoingData = await outgoingResponse.json()
-    const outgoingTransfers = outgoingData.result?.transfers || []
+    const transactionsData = await transactionsResponse.json()
+    const transfers = transactionsData.result?.transfers || []
 
     let totalFees = 0
+    let totalNFTMints = 0
     let totalNFTPurchases = 0
     
-    for (const transfer of outgoingTransfers) {
-      if (transfer.category === 'erc721' || transfer.category === 'erc1155') {
-        if (transfer.value && transfer.value > 0) {
-          totalNFTPurchases += transfer.value
-        }
+    for (const transfer of transfers) {
+      // Calculate gas fees
+      if (transfer.metadata?.gasPrice && transfer.metadata?.gasUsed) {
+        const gasFee = (parseInt(transfer.metadata.gasPrice, 16) * parseInt(transfer.metadata.gasUsed, 16)) / 1e18
+        totalFees += gasFee
+      } else {
+        totalFees += 0.0001 // Estimated average gas fee
       }
-      
-      totalFees += 0.0001
+
+      if (transfer.category === 'erc721' || transfer.category === 'erc1155') {
+        const transferValue = parseFloat(transfer.value || '0')
+        const rawInput = transfer.rawContract?.rawInput || ''
+        
+        const isMintFunction = rawInput.toLowerCase().includes('mint') || 
+                              rawInput.startsWith('0x40c10f19') || // mint(address,uint256)
+                              rawInput.startsWith('0xa0712d68') || // mint(uint256)
+                              rawInput.startsWith('0x6a627842')    // mint(address)
+        
+        if (isMintFunction) {
+          // It's a mint by function name - count the value sent (regardless of amount)
+          totalNFTMints += transferValue
+        } else if (transferValue > 0) {
+          // Has value but no mint function - still count as mint
+          totalNFTMints += transferValue
+        }
+        // If no value and no mint function, it's likely a transfer (ignore)
+      }
     }
 
-    // Fetch incoming transfers
+    // Fetch incoming transfers for sales
     const incomingResponse = await fetch(ALCHEMY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -87,15 +107,17 @@ export async function GET(request: NextRequest) {
     let totalNFTSales = 0
     
     for (const transfer of incomingTransfers) {
-      if (transfer.value && transfer.value > 0) {
-        totalNFTSales += transfer.value
+      const transferValue = parseFloat(transfer.value || '0')
+      if (transferValue > 0) {
+        totalNFTSales += transferValue
       }
     }
     
     return NextResponse.json({
-      totalFees: totalFees.toString(),
-      totalNFTPurchases: totalNFTPurchases.toString(),
-      totalNFTSales: totalNFTSales.toString(),
+      totalFees: totalFees.toFixed(6),
+      totalNFTMints: totalNFTMints.toFixed(6),
+      totalNFTPurchases: totalNFTPurchases.toFixed(6),
+      totalNFTSales: totalNFTSales.toFixed(6),
     })
   } catch (error) {
     console.error('[API] Error fetching wallet stats:', error)
@@ -103,6 +125,7 @@ export async function GET(request: NextRequest) {
       { 
         error: 'Failed to fetch wallet stats',
         totalFees: '0.05',
+        totalNFTMints: '0.3',
         totalNFTPurchases: '1.2',
         totalNFTSales: '2.5',
       },

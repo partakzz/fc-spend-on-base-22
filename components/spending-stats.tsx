@@ -7,6 +7,7 @@ import useSWR from "swr"
 interface SpendingStatsProps {
   stats: {
     totalFees: bigint
+    totalNFTMints: bigint // added totalNFTMints field
     totalNFTPurchases: bigint
     totalNFTSales: bigint
   }
@@ -57,6 +58,22 @@ export function SpendingStats({ stats, usdMode, walletAddress }: SpendingStatsPr
           </span>
           <span className="text-base text-muted-foreground">
             {formatUSD(stats.totalFees)}
+          </span>
+        </div>
+      </div>
+
+      <div className="border-t border-border" />
+
+      <div className="space-y-1.5">
+        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Total NFT Mints
+        </h3>
+        <div className="flex items-baseline gap-2">
+          <span className="text-xl font-bold text-foreground">
+            {formatETH(stats.totalNFTMints)}
+          </span>
+          <span className="text-base text-muted-foreground">
+            {formatUSD(stats.totalNFTMints)}
           </span>
         </div>
       </div>

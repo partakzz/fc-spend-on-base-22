@@ -16,6 +16,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false)
   const [stats, setStats] = useState<{
     totalFees: bigint
+    totalNFTMints: bigint // added totalNFTMints field
     totalNFTPurchases: bigint
     totalNFTSales: bigint
   } | null>(null)
@@ -49,6 +50,7 @@ export default function Home() {
       
       return {
         totalFees: BigInt(Math.floor(parseFloat(data.totalFees) * 1e18)),
+        totalNFTMints: BigInt(Math.floor(parseFloat(data.totalNFTMints) * 1e18)), // added totalNFTMints parsing
         totalNFTPurchases: BigInt(Math.floor(parseFloat(data.totalNFTPurchases) * 1e18)),
         totalNFTSales: BigInt(Math.floor(parseFloat(data.totalNFTSales) * 1e18)),
       }
@@ -56,6 +58,7 @@ export default function Home() {
       console.error('Error fetching wallet stats:', error)
       return {
         totalFees: BigInt(Math.floor(0.05 * 1e18)),
+        totalNFTMints: BigInt(Math.floor(0.3 * 1e18)), // added demo totalNFTMints value
         totalNFTPurchases: BigInt(Math.floor(1.2 * 1e18)),
         totalNFTSales: BigInt(Math.floor(2.5 * 1e18)),
       }
