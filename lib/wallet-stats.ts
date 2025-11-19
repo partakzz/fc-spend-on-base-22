@@ -1,28 +1,3 @@
-import { createPublicClient, http, formatEther } from 'viem'
-import { base } from 'viem/chains'
-import { formatUnits } from 'ethers'
-
-const client = createPublicClient({
-  chain: base,
-  transport: http('https://base-mainnet.g.alchemy.com/v2/yourAlchemyAPIKey'), // Placeholder for server-side API key
-})
-
-interface AlchemyTransfer {
-  category: string
-  value?: number
-  asset?: string
-  from?: string
-  to?: string
-  blockNum?: string
-  hash?: string
-}
-
-interface AlchemyResponse {
-  result?: {
-    transfers: AlchemyTransfer[]
-  }
-}
-
 export async function fetchWalletStats(address: string) {
   try {
     console.log('[v0] Fetching wallet stats for:', address)

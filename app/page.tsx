@@ -3,12 +3,10 @@
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import sdk from "@farcaster/frame-sdk"
 import { SpendingStats } from "@/components/spending-stats"
 import { fetchWalletStats } from "@/lib/wallet-stats"
 
 export default function Home() {
-  const [isSDKLoaded, setIsSDKLoaded] = useState(false)
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [stats, setStats] = useState<{
@@ -17,51 +15,34 @@ export default function Home() {
     totalNFTSales: bigint
   } | null>(null)
   const [usdMode, setUsdMode] = useState<'at_time' | 'now'>('at_time')
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    const initSDK = async () => {
-      try {
-        const isInFarcaster = typeof window !== 'undefined' && 
-          (window.location !== window.parent.location || 
-           /farcaster/i.test(window.navigator.userAgent))
-        
-        if (isInFarcaster) {
-          await sdk.actions.ready()
-        }
-      } catch (error) {
-        console.error('Error initializing Farcaster SDK:', error)
-      } finally {
-        setIsSDKLoaded(true)
-      }
-    }
-
-    initSDK()
+    setMounted(true)
   }, [])
 
   const connectWallet = async () => {
-    if (!isSDKLoaded) return
-
     try {
       setIsLoading(true)
       
       let address: string | null = null
       
-      try {
-        const provider = await sdk.wallet.ethProvider
-        
-        if (provider) {
-          const accounts = await provider.request({
+      // Try to connect with Ethereum provider if available
+      if (typeof window !== 'undefined' && (window as any).ethereum) {
+        try {
+          const accounts = await (window as any).ethereum.request({
             method: 'eth_requestAccounts',
-          }) as string[]
+          })
           
           if (accounts && accounts.length > 0) {
             address = accounts[0]
           }
+        } catch (error) {
+          console.log('Wallet connection failed, using demo address')
         }
-      } catch (sdkError) {
-        console.log('Farcaster wallet not available, using demo address')
       }
       
+      // Use demo address if no wallet connected
       if (!address) {
         address = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
       }
@@ -74,6 +55,7 @@ export default function Home() {
     } catch (error) {
       console.error('Error connecting wallet:', error)
       
+      // Fallback to demo address
       const mockAddress = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
       setWalletAddress(mockAddress)
       
@@ -88,15 +70,8 @@ export default function Home() {
     setUsdMode(prev => prev === 'at_time' ? 'now' : 'at_time')
   }
 
-  if (!isSDKLoaded) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-        <div className="text-center">
-          <h1 className="text-5xl font-bold text-primary mb-4">You Spend</h1>
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto"></div>
-        </div>
-      </main>
-    )
+  if (!mounted) {
+    return null
   }
 
   return (
