@@ -23,8 +23,9 @@ interface RateLimitData {
 interface SearchResult {
   fid: number
   username: string
+  display_name: string
   pfp_url: string
-  custody_address: string
+  custody_address?: string
   verified_addresses?: {
     eth_addresses: string[]
   }
@@ -104,6 +105,98 @@ export default function Home() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    if (checkAddress.length < 2) {
+      setSearchResults([])
+      setShowDropdown(false)
+      return
+    }
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    setIsSearching(true)
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        // Search by address
+        if (checkAddress.startsWith('0x') && checkAddress.length > 10) {
+          const response = await fetch(
+            `https://api.neynar.com/v2/farcaster/user/bulk-by-address?addresses=${checkAddress}`,
+            {
+              headers: {
+                'accept': 'application/json',
+                'api_key': 'NEYNAR_API_DOCS'
+              }
+            }
+          )
+          
+          const data = await response.json()
+
+          if (data && Object.keys(data).length > 0) {
+            const users = Object.values(data).flat().map((user: any) => ({
+              fid: user.fid,
+              username: user.username,
+              display_name: user.display_name || user.username,
+              pfp_url: user.pfp_url,
+              custody_address: user.custody_address,
+              verified_addresses: user.verified_addresses
+            }))
+            
+            setSearchResults(users as SearchResult[])
+            setShowDropdown(users.length > 0)
+          } else {
+            setSearchResults([])
+            setShowDropdown(false)
+          }
+        } else {
+          // Search by username
+          const response = await fetch(
+            `https://api.neynar.com/v2/farcaster/user/search?q=${encodeURIComponent(checkAddress)}&limit=5`,
+            {
+              headers: {
+                'accept': 'application/json',
+                'api_key': 'NEYNAR_API_DOCS'
+              }
+            }
+          )
+          
+          const data = await response.json()
+
+          if (data.result?.users && data.result.users.length > 0) {
+            const users = data.result.users.map((user: any) => ({
+              fid: user.fid,
+              username: user.username,
+              display_name: user.display_name || user.username,
+              pfp_url: user.pfp_url,
+              custody_address: user.custody_address,
+              verified_addresses: user.verified_addresses
+            }))
+            
+            setSearchResults(users)
+            setShowDropdown(users.length > 0)
+          } else {
+            setSearchResults([])
+            setShowDropdown(false)
+          }
+        }
+      } catch (error) {
+        console.error('Error searching Farcaster users:', error)
+        setSearchResults([])
+        setShowDropdown(false)
+      } finally {
+        setIsSearching(false)
+      }
+    }, 300)
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [checkAddress])
 
   const fetchStats = async (address: string) => {
     try {
@@ -264,8 +357,66 @@ export default function Home() {
   const handleSearchInput = async (value: string) => {
     setCheckAddress(value)
     setRateLimitError(null)
+  }
+
+  const getPreferredBaseAddress = (user: SearchResult): string => {
+    return user.custody_address || user.verified_addresses?.eth_addresses?.[0] || ''
+  }
+
+  const handleSelectSearchResult = async (user: SearchResult) => {
+    const address = getPreferredBaseAddress(user)
+    
+    if (!address) {
+      alert('No wallet address found for this user')
+      return
+    }
+
+    setCheckAddress(address)
     setShowDropdown(false)
     setSearchResults([])
+
+    // Check if already in the list
+    if (checkedWallets.some(w => w.address.toLowerCase() === address.toLowerCase())) {
+      switchToWallet(address)
+      setCheckAddress('')
+      return
+    }
+    
+    // Check rate limit
+    if (!checkRateLimit()) {
+      setRateLimitError('Max check limit 5 wallets 24h')
+      return
+    }
+    
+    setIsLoading(true)
+    
+    try {
+      const newWallet: CheckedWallet = {
+        address: address,
+        username: user.username,
+        pfpUrl: user.pfp_url || '',
+        timestamp: Date.now()
+      }
+      
+      const updatedWallets = [...checkedWallets, newWallet]
+      setCheckedWallets(updatedWallets)
+      localStorage.setItem('checked_wallets', JSON.stringify(updatedWallets))
+      
+      incrementRateLimit()
+      
+      setCurrentAddress(address)
+      setStats(null)
+      
+      const walletStats = await fetchStats(address)
+      setStats(walletStats)
+      
+      setCheckAddress('')
+    } catch (error) {
+      console.error('Error checking address:', error)
+      alert('Failed to check address')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleCheckAddress = async () => {
@@ -412,7 +563,7 @@ export default function Home() {
                   <div className="relative flex-1">
                     <Input
                       type="text"
-                      placeholder="Enter wallet address (0x...)"
+                      placeholder="Address or username"
                       value={checkAddress}
                       onChange={(e) => handleSearchInput(e.target.value)}
                       className="w-full"
@@ -429,6 +580,34 @@ export default function Home() {
                   </Button>
                 </div>
               </Card>
+
+              {showDropdown && searchResults.length > 0 && (
+                <Card className="absolute top-full mt-2 w-full z-50 max-h-[300px] overflow-y-auto">
+                  {searchResults.map((user) => (
+                    <button
+                      key={user.fid}
+                      onClick={() => handleSelectSearchResult(user)}
+                      className="w-full text-left p-3 hover:bg-accent transition-colors border-b last:border-b-0 flex items-center gap-3"
+                    >
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={user.pfp_url || '/placeholder.svg'} alt={user.username} />
+                        <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{user.display_name}</p>
+                        <p className="text-xs text-muted-foreground">@{user.username}</p>
+                      </div>
+                      {getPreferredBaseAddress(user) && (
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground font-mono">
+                            {getPreferredBaseAddress(user).slice(0, 6)}...{getPreferredBaseAddress(user).slice(-4)}
+                          </p>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </Card>
+              )}
               
               {rateLimitError && (
                 <p className="text-sm text-red-500 mt-2">{rateLimitError}</p>
