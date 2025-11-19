@@ -264,64 +264,17 @@ export default function Home() {
   const handleSearchInput = async (value: string) => {
     setCheckAddress(value)
     setRateLimitError(null)
-    
-    // Clear previous timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current)
-    }
-
-    if (!value.trim()) {
-      setSearchResults([])
-      setShowDropdown(false)
-      return
-    }
-
-    // If it's an Ethereum address, don't search
-    if (/^0x[a-fA-F0-9]{40}$/.test(value)) {
-      setSearchResults([])
-      setShowDropdown(false)
-      return
-    }
-
-    // Debounce search for username
-    searchTimeoutRef.current = setTimeout(async () => {
-      setIsSearching(true)
-      try {
-        const response = await fetch(`/api/search-farcaster?q=${encodeURIComponent(value)}`)
-        if (response.ok) {
-          const data = await response.json()
-          setSearchResults(data.users || [])
-          setShowDropdown(data.users && data.users.length > 0)
-        }
-      } catch (error) {
-        console.error('Search error:', error)
-        setSearchResults([])
-        setShowDropdown(false)
-      } finally {
-        setIsSearching(false)
-      }
-    }, 300)
-  }
-
-  const selectSearchResult = (result: SearchResult) => {
-    const address = result.verified_addresses?.eth_addresses?.[0] || result.custody_address
-    setCheckAddress(address)
     setShowDropdown(false)
     setSearchResults([])
-    
-    // Automatically trigger check
-    handleCheckAddressWithData(address, result.username, result.pfp_url)
   }
 
-  const handleCheckAddressWithData = async (
-    address: string,
-    username?: string,
-    pfpUrl?: string
-  ) => {
+  const handleCheckAddress = async () => {
     setRateLimitError(null)
     
+    const address = checkAddress.trim()
+    
     if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
-      alert('Please enter a valid Ethereum address')
+      alert('Please enter a valid Ethereum address (0x...)')
       return
     }
     
@@ -341,20 +294,12 @@ export default function Home() {
     setIsLoading(true)
     
     try {
-      // Use provided data or fetch if not available
-      let finalUsername = username
-      let finalPfpUrl = pfpUrl
-
-      if (!finalUsername) {
-        const profile = await fetchFarcasterProfile(address)
-        finalUsername = profile?.username
-        finalPfpUrl = profile?.pfpUrl
-      }
+      const profile = await fetchFarcasterProfile(address)
       
       const newWallet: CheckedWallet = {
         address: address,
-        username: finalUsername || `${address.slice(0, 6)}...${address.slice(-4)}`,
-        pfpUrl: finalPfpUrl || '',
+        username: profile?.username || `${address.slice(0, 6)}...${address.slice(-4)}`,
+        pfpUrl: profile?.pfpUrl || '',
         timestamp: Date.now()
       }
       
@@ -377,10 +322,6 @@ export default function Home() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const handleCheckAddress = async () => {
-    await handleCheckAddressWithData(checkAddress)
   }
 
   const switchToWallet = async (address: string) => {
@@ -471,7 +412,7 @@ export default function Home() {
                   <div className="relative flex-1">
                     <Input
                       type="text"
-                      placeholder="Enter username or wallet address"
+                      placeholder="Enter wallet address (0x...)"
                       value={checkAddress}
                       onChange={(e) => handleSearchInput(e.target.value)}
                       className="w-full"
@@ -488,30 +429,6 @@ export default function Home() {
                   </Button>
                 </div>
               </Card>
-
-              {showDropdown && searchResults.length > 0 && (
-                <Card className="absolute z-10 w-full mt-1 max-h-60 overflow-y-auto">
-                  {searchResults.map((result) => (
-                    <div
-                      key={result.fid}
-                      className="p-3 hover:bg-accent cursor-pointer flex items-center gap-3 border-b last:border-b-0"
-                      onClick={() => selectSearchResult(result)}
-                    >
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={result.pfp_url || "/placeholder.svg"} alt={result.username} />
-                        <AvatarFallback>{result.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col">
-                        <span className="font-medium">@{result.username}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {result.verified_addresses?.eth_addresses?.[0]?.slice(0, 6)}...
-                          {result.verified_addresses?.eth_addresses?.[0]?.slice(-4)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </Card>
-              )}
               
               {rateLimitError && (
                 <p className="text-sm text-red-500 mt-2">{rateLimitError}</p>
