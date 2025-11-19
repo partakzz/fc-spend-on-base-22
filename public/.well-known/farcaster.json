@@ -1,6 +1,6 @@
 {
   "frame": {
-    "name": "You Spend in BASE",
+    "name": "You Spend",
     "version": "1",
     "iconUrl": "https://fc-spend-on-base-22.vercel.app/icon.png",
     "homeUrl": "https://fc-spend-on-base-22.vercel.app",
@@ -8,8 +8,8 @@
     "splashImageUrl": "https://fc-spend-on-base-22.vercel.app/splash.png",
     "splashBackgroundColor": "#ffffff",
     "webhookUrl": "https://fc-spend-on-base-22.vercel.app/api/webhook",
-    "subtitle": "Shows how much you spend on BASE",
-    "description": "Shows how much you spend on BASE",
+    "subtitle": "You Spend",
+    "description": "App shows how much you spend in Base network",
     "primaryCategory": "utility"
   },
   "accountAssociation": {
