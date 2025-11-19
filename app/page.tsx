@@ -7,8 +7,16 @@ import { SpendingStats } from "@/components/spending-stats"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import sdk from "@farcaster/frame-sdk"
 
+interface WalletInfo {
+  address: string
+  username: string
+  pfpUrl: string
+  isActive: boolean
+}
+
 export default function Home() {
-  const [walletAddress, setWalletAddress] = useState<string | null>(null)
+  const [wallets, setWallets] = useState<WalletInfo[]>([])
+  const [selectedWallet, setSelectedWallet] = useState<string | null>(null)
   const [userProfile, setUserProfile] = useState<{
     username: string
     pfpUrl: string
@@ -41,20 +49,21 @@ export default function Home() {
   useEffect(() => {
     if (!sdkReady) return
     
-    const savedAddress = localStorage.getItem('wallet_address')
-    const savedUsername = localStorage.getItem('wallet_username')
-    const savedPfpUrl = localStorage.getItem('wallet_pfp')
+    const savedWallets = localStorage.getItem('wallets')
+    const savedSelectedWallet = localStorage.getItem('selected_wallet')
     
-    if (savedAddress) {
-      setWalletAddress(savedAddress)
-      setUserProfile({
-        username: savedUsername || 'Anonymous',
-        pfpUrl: savedPfpUrl || ''
-      })
+    if (savedWallets) {
+      const parsedWallets = JSON.parse(savedWallets)
+      setWallets(parsedWallets)
       
-      fetchStats(savedAddress).then(walletStats => {
-        setStats(walletStats)
-      })
+      const walletToLoad = savedSelectedWallet || parsedWallets.find((w: WalletInfo) => w.isActive)?.address
+      
+      if (walletToLoad) {
+        setSelectedWallet(walletToLoad)
+        fetchStats(walletToLoad).then(walletStats => {
+          setStats(walletStats)
+        })
+      }
     }
   }, [sdkReady])
 
@@ -89,7 +98,7 @@ export default function Home() {
     try {
       setIsLoading(true)
       
-      let address: string | null = null
+      const connectedWallets: WalletInfo[] = []
       let username = "Anonymous"
       let pfpUrl = ""
       
@@ -104,59 +113,98 @@ export default function Home() {
             console.log("[v0] Got Farcaster user:", username)
           }
           
-          const wallet = await sdk.wallet.ethProvider.request({
+          const addresses = await sdk.wallet.ethProvider.request({
             method: 'eth_requestAccounts',
           }) as string[]
           
-          if (wallet && wallet.length > 0) {
-            address = wallet[0]
-            console.log("[v0] Connected to Farcaster wallet:", address)
+          if (addresses && addresses.length > 0) {
+            console.log("[v0] Connected to Farcaster wallets:", addresses)
+            
+            addresses.forEach((address, index) => {
+              connectedWallets.push({
+                address,
+                username: `${username} ${index + 1}`,
+                pfpUrl,
+                isActive: index === 0 // First wallet is active
+              })
+            })
           }
         } catch (error) {
           console.log("[v0] Farcaster wallet not available, trying fallback")
         }
       }
       
-      if (!address && typeof window !== 'undefined' && (window as any).ethereum) {
+      // Fallback to browser wallet if Farcaster not available
+      if (connectedWallets.length === 0 && typeof window !== 'undefined' && (window as any).ethereum) {
         try {
           const accounts = await (window as any).ethereum.request({
             method: 'eth_requestAccounts',
           })
           
           if (accounts && accounts.length > 0) {
-            address = accounts[0]
+            accounts.forEach((address: string, index: number) => {
+              connectedWallets.push({
+                address,
+                username: `Wallet ${index + 1}`,
+                pfpUrl: "",
+                isActive: index === 0
+              })
+            })
           }
         } catch (error) {
           console.log('Wallet connection failed, using demo address')
         }
       }
       
-      if (!address) {
-        address = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+      if (connectedWallets.length === 0) {
+        connectedWallets.push({
+          address: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+          username: "Demo Wallet",
+          pfpUrl: "",
+          isActive: true
+        })
       }
       
-      localStorage.setItem('wallet_address', address)
-      localStorage.setItem('wallet_username', username)
-      localStorage.setItem('wallet_pfp', pfpUrl)
+      localStorage.setItem('wallets', JSON.stringify(connectedWallets))
       
-      setWalletAddress(address)
-      setUserProfile({ username, pfpUrl })
+      const activeWallet = connectedWallets.find(w => w.isActive) || connectedWallets[0]
+      localStorage.setItem('selected_wallet', activeWallet.address)
       
-      const walletStats = await fetchStats(address)
+      setWallets(connectedWallets)
+      setSelectedWallet(activeWallet.address)
+      setUserProfile({ username: activeWallet.username, pfpUrl: activeWallet.pfpUrl })
+      
+      const walletStats = await fetchStats(activeWallet.address)
       setStats(walletStats)
       
     } catch (error) {
       console.error('Error connecting wallet:', error)
       
-      const mockAddress = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
-      setWalletAddress(mockAddress)
-      setUserProfile({ username: "Demo User", pfpUrl: "" })
+      const demoWallet = {
+        address: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+        username: "Demo User",
+        pfpUrl: "",
+        isActive: true
+      }
       
-      const walletStats = await fetchStats(mockAddress)
+      setWallets([demoWallet])
+      setSelectedWallet(demoWallet.address)
+      setUserProfile({ username: demoWallet.username, pfpUrl: demoWallet.pfpUrl })
+      
+      const walletStats = await fetchStats(demoWallet.address)
       setStats(walletStats)
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleWalletSelect = async (address: string) => {
+    setSelectedWallet(address)
+    localStorage.setItem('selected_wallet', address)
+    
+    setStats(null) // Show loading
+    const walletStats = await fetchStats(address)
+    setStats(walletStats)
   }
 
   const toggleUsdMode = () => {
@@ -178,22 +226,36 @@ export default function Home() {
           You Spend
         </h1>
 
-        {walletAddress && userProfile && (
-          <div className="flex items-center justify-center gap-3 py-2">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={userProfile.pfpUrl || "/placeholder.svg"} alt={userProfile.username} />
-              <AvatarFallback>{userProfile.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold">{userProfile.username}</span>
-              <span className="text-xs text-muted-foreground">
-                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-              </span>
-            </div>
+        {wallets.length > 0 && (
+          <div className="grid grid-cols-2 gap-3">
+            {wallets.map((wallet) => (
+              <Card 
+                key={wallet.address}
+                className={`p-3 cursor-pointer transition-all hover:shadow-md ${
+                  selectedWallet === wallet.address 
+                    ? 'ring-2 ring-primary bg-primary/5' 
+                    : 'hover:bg-accent'
+                }`}
+                onClick={() => handleWalletSelect(wallet.address)}
+              >
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={wallet.pfpUrl || "/placeholder.svg"} alt={wallet.username} />
+                    <AvatarFallback className="text-xs">{wallet.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-xs font-semibold truncate">{wallet.username}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}
+                    </span>
+                  </div>
+                </div>
+              </Card>
+            ))}
           </div>
         )}
 
-        {!walletAddress ? (
+        {wallets.length === 0 ? (
           <Card className="p-8 flex items-center justify-center min-h-[300px]">
             <Button 
               onClick={connectWallet}
@@ -222,7 +284,7 @@ export default function Home() {
                 <SpendingStats 
                   stats={stats}
                   usdMode={usdMode}
-                  walletAddress={walletAddress}
+                  walletAddress={selectedWallet || ''}
                 />
               ) : (
                 <div className="flex items-center justify-center py-12">
