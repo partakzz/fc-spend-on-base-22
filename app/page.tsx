@@ -4,17 +4,22 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { SpendingStats } from "@/components/spending-stats"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import sdk from "@farcaster/frame-sdk"
 
 export default function Home() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
+  const [userProfile, setUserProfile] = useState<{
+    username: string
+    pfpUrl: string
+  } | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [stats, setStats] = useState<{
     totalFees: bigint
     totalNFTPurchases: bigint
     totalNFTSales: bigint
   } | null>(null)
-  const [usdMode, setUsdMode] = useState<'at_time' | 'now'>('at_time')
+  const [usdMode, setUsdMode] = useState<'at_time' | 'now'>('now')
   const [sdkReady, setSdkReady] = useState(false)
 
   useEffect(() => {
@@ -62,19 +67,37 @@ export default function Home() {
       setIsLoading(true)
       
       let address: string | null = null
+      let username = "Anonymous"
+      let pfpUrl = ""
       
       if (sdkReady) {
         try {
+          // Get Farcaster context with user info
           const context = await sdk.context
-          if (context?.user?.fid) {
-            console.log("[v0] Got Farcaster user:", context.user.fid)
+          
+          if (context?.user) {
+            username = context.user.username || context.user.displayName || `fid:${context.user.fid}`
+            pfpUrl = context.user.pfpUrl || ""
+            
+            console.log("[v0] Got Farcaster user:", username)
+          }
+          
+          // Get wallet address from Farcaster embedded wallet
+          const wallet = await sdk.wallet.ethProvider.request({
+            method: 'eth_requestAccounts',
+          }) as string[]
+          
+          if (wallet && wallet.length > 0) {
+            address = wallet[0]
+            console.log("[v0] Connected to Farcaster wallet:", address)
           }
         } catch (error) {
-          console.log("[v0] Farcaster context not available")
+          console.log("[v0] Farcaster wallet not available, trying fallback")
         }
       }
       
-      if (typeof window !== 'undefined' && (window as any).ethereum) {
+      // Fallback to regular Ethereum provider if Farcaster wallet unavailable
+      if (!address && typeof window !== 'undefined' && (window as any).ethereum) {
         try {
           const accounts = await (window as any).ethereum.request({
             method: 'eth_requestAccounts',
@@ -93,6 +116,7 @@ export default function Home() {
       }
       
       setWalletAddress(address)
+      setUserProfile({ username, pfpUrl })
       
       const walletStats = await fetchStats(address)
       setStats(walletStats)
@@ -102,6 +126,7 @@ export default function Home() {
       
       const mockAddress = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
       setWalletAddress(mockAddress)
+      setUserProfile({ username: "Demo User", pfpUrl: "" })
       
       const walletStats = await fetchStats(mockAddress)
       setStats(walletStats)
@@ -129,6 +154,21 @@ export default function Home() {
           You Spend
         </h1>
 
+        {walletAddress && userProfile && (
+          <div className="flex items-center justify-center gap-3 py-2">
+            <Avatar className="h-10 w-10">
+              <AvatarImage src={userProfile.pfpUrl || "/placeholder.svg"} alt={userProfile.username} />
+              <AvatarFallback>{userProfile.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold">{userProfile.username}</span>
+              <span className="text-xs text-muted-foreground">
+                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+              </span>
+            </div>
+          </div>
+        )}
+
         {!walletAddress ? (
           <Card className="p-8 flex items-center justify-center min-h-[300px]">
             <Button 
@@ -149,11 +189,11 @@ export default function Home() {
                 size="lg"
                 className="min-w-[200px]"
               >
-                {usdMode === 'at_time' ? 'In USD at time' : 'In USD now'}
+                {usdMode === 'at_time' ? 'Time of Txn' : 'Current'}
               </Button>
             </div>
 
-            <Card className="p-6">
+            <Card className="p-5">
               {stats ? (
                 <SpendingStats 
                   stats={stats}
