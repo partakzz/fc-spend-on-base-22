@@ -37,7 +37,6 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Error fetching wallet stats:', error)
-      // Return demo data on error
       return {
         totalFees: BigInt(Math.floor(0.05 * 1e18)),
         totalNFTPurchases: BigInt(Math.floor(1.2 * 1e18)),
@@ -52,7 +51,6 @@ export default function Home() {
       
       let address: string | null = null
       
-      // Try to connect with Ethereum provider if available
       if (typeof window !== 'undefined' && (window as any).ethereum) {
         try {
           const accounts = await (window as any).ethereum.request({
@@ -67,7 +65,6 @@ export default function Home() {
         }
       }
       
-      // Use demo address if no wallet connected
       if (!address) {
         address = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
       }
@@ -80,7 +77,6 @@ export default function Home() {
     } catch (error) {
       console.error('Error connecting wallet:', error)
       
-      // Fallback to demo address
       const mockAddress = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
       setWalletAddress(mockAddress)
       
@@ -96,7 +92,18 @@ export default function Home() {
   }
 
   if (!mounted) {
-    return null
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-6">
+        <div className="w-full max-w-md space-y-6">
+          <h1 className="text-5xl font-bold text-center text-primary">
+            You Spend
+          </h1>
+          <Card className="p-8 flex items-center justify-center min-h-[300px]">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+          </Card>
+        </div>
+      </main>
+    )
   }
 
   return (

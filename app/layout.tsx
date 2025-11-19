@@ -3,8 +3,15 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const geistSans = Geist({ 
+  subsets: ["latin"],
+  variable: '--font-sans',
+})
+
+const geistMono = Geist_Mono({ 
+  subsets: ["latin"],
+  variable: '--font-mono',
+})
 
 export const metadata: Metadata = {
   title: 'You Spend - Track Your Base Network Transactions',
@@ -12,6 +19,12 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'You Spend',
     description: 'Track your ETH spending on fees and NFTs on Base Network',
+    images: ['/api/og'],
+  },
+  other: {
+    'fc:frame': 'vNext',
+    'fc:frame:image': '/api/og',
+    'fc:frame:button:1': 'Open App',
   },
     generator: 'v0.app'
 }
@@ -30,8 +43,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className="font-sans antialiased">
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
         {children}
         <Analytics />
       </body>
