@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { SpendingStats } from "@/components/spending-stats"
@@ -14,11 +14,6 @@ export default function Home() {
     totalNFTSales: bigint
   } | null>(null)
   const [usdMode, setUsdMode] = useState<'at_time' | 'now'>('at_time')
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   const fetchStats = async (address: string) => {
     try {
@@ -91,21 +86,6 @@ export default function Home() {
     setUsdMode(prev => prev === 'at_time' ? 'now' : 'at_time')
   }
 
-  if (!mounted) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-6">
-        <div className="w-full max-w-md space-y-6">
-          <h1 className="text-5xl font-bold text-center text-primary">
-            You Spend
-          </h1>
-          <Card className="p-8 flex items-center justify-center min-h-[300px]">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
-          </Card>
-        </div>
-      </main>
-    )
-  }
-
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-6">
       <div className="w-full max-w-md space-y-6">
@@ -121,14 +101,7 @@ export default function Home() {
               size="lg"
               className="text-lg px-8 py-6"
             >
-              {isLoading ? (
-                <>
-                  <span className="animate-spin mr-2">⏳</span>
-                  Connecting...
-                </>
-              ) : (
-                'Connect Wallet'
-              )}
+              {isLoading ? 'Connecting...' : 'Connect Wallet'}
             </Button>
           </Card>
         ) : (
